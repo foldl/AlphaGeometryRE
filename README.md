@@ -5,7 +5,7 @@ goal to [make](https://github.com/google-deepmind/alphageometry/issues/130)
 [it](https://github.com/google-deepmind/alphageometry/issues/116)
 [easy](https://github.com/google-deepmind/alphageometry/issues/96) to use (especially on [Windows](https://github.com/google-deepmind/alphageometry/issues/120)):
 
-* Use [ChatLLM.cpp](http://github.com/foldl/chatllm.cpp) form LLM interference.
+* Use [ChatLLM.cpp](http://github.com/foldl/chatllm.cpp) for LLM interference.
 
 * Greatly **simplified** _requirements.txt_.
 
@@ -127,7 +127,7 @@ will write the proof to a text file.
 Running on all problems in `imo_ag_30.txt` will yield solutions to
 14 of them, as reported in Table 1 in our paper.
 
-### Mode: AlphaGeometry
+### Example of AlphaGeometry
 
 As a simple example, we load `--problem_name=orthocenter`
 from `--problem_file=examples.txt`.
