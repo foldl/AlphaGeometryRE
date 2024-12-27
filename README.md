@@ -1,3 +1,25 @@
+# AlphaGeometryRE
+
+AlphaGeometryRE is an re-engineered version [AlphaGeometry](https://github.com/google-deepmind/alphageometry) with a
+goal to [make](https://github.com/google-deepmind/alphageometry/issues/130)
+[it](https://github.com/google-deepmind/alphageometry/issues/116)
+[easy](https://github.com/google-deepmind/alphageometry/issues/96) to use (especially on [Windows](https://github.com/google-deepmind/alphageometry/issues/120)):
+
+* Use [ChatLLM.cpp](http://github.com/foldl/chatllm.cpp) form LLM interference.
+
+* Greatly **simplified** _requirements.txt_.
+
+* Indent with **four** spaces (🖕 two spaces).
+
+Plan:
+
+* [ ] LM Beam search.
+
+    Note: Since beam search is not implemented yet, full results of the paper might not be achieved.
+
+* [ ] A new description language like [this](https://reference.wolfram.com/legacy/language/v14/guide/PlaneGeometry.html).
+
+--------
 
 # Solving Olympiad Geometry without Human Demonstrations
 
@@ -9,162 +31,73 @@ introduced in the [Nature 2024](https://www.nature.com/articles/s41586-023-06747
 
 *<center>"Solving Olympiad Geometry without Human Demonstrations".</center>*
 
-
 </br>
-
 
 <center>
 <img alt="fig1" width="800px" src="fig1.svg">
 </center>
 
-
 ## Dependencies
 
-For the instructions presented below,
-we use Python 3.10.9, and dependencies with their exact
-version numbers listed in `requirements.txt`.
+1. Install ChatLLM.cpp DLL (or .so whatever)
 
-Our code depends on `meliad`, which is
-not a registered package with `pip`. See instructions below
-for how to manually install `meliad`.
+    DLL will be contained in a release. Or, you can [build](https://github.com/foldl/chatllm.cpp/blob/master/docs/binding.md#precondition) `libchatllmb` from source,
+    and copy the DLL into `src/chatllm/bindings`.
 
-Note that one can still run the DDAR solver
-without the `meliad` and `sentencepiece` dependencies.
+1. Install Python dependencies
 
-## Run the instructions
+    ```sh
+    pip install -r requirements.txt
+    ```
 
-All instructions in this `README.md` can be run in one go by:
+    Optionally, you can create a virtual environment, and then install dependencies into it.
 
-```
-bash run.sh
-```
+## Command line flags
 
-Below, we explain these instructions step-by-step.
+A list of command line flags.
 
-## Install dependencies, download weights and vocabulary.
+* `--mode`: solver selection. (default: `ddar`)
 
-Installation is done in a virtual environment:
+    1. `--mode=ddar`: select the DDAR solver.
+    1. `--mode=alphageometry`: select the AlphaGeometry solver.
 
-```
-virtualenv -p python3 .
-source ./bin/activate
-pip install --require-hashes -r requirements.txt
-```
+* `--problems_file`: problem file
 
-Download weights and vocabulary:
+    Example: `--problems_file examples\examples.txt`.
 
-```
-bash download.sh
-DATA=ag_ckpt_vocab
-```
+* `--problem_name`: name of a problem in the given problem file
 
-Finally, install `meliad` separately as it is not
-registered with `pip`:
+    Example: `--problems_file orthocenter`. `orthocenter` is a problem in `examples\examples.txt`.
 
-```
-MELIAD_PATH=meliad_lib/meliad
-mkdir -p $MELIAD_PATH
-git clone https://github.com/google-research/meliad $MELIAD_PATH
-export PYTHONPATH=$PYTHONPATH:$MELIAD_PATH
-```
+* `--defs_file` & `--rules_file`: definitions & deduction rules.
 
-## Set up common flags
+    Defaults to `data\defs` & `data\rules.txt` respectively.
 
-Before running the python scripts,
-let us first prepare some commonly used flags.
-The symbolic engine needs definitions and deduction rules to operate.
-These definitions and rules are provided in two text files
-`defs.txt` and `rules.txt`.
+* `--beam_size`: beam size of the proof search. (default: 1)
 
-```shell
-DDAR_ARGS=(
-  --defs_file=$(pwd)/defs.txt \
-  --rules_file=$(pwd)/rules.txt \
-);
-```
+* `--search_depth`: search depth of the proof search. (default: 1)
 
-Next, we define the flags relevant to the proof search.
-To reproduce the simple examples below,
-we use lightweight values for the proof search parameters:
+### Example of DDAR
 
-```shell
-BATCH_SIZE=2
-BEAM_SIZE=2
-DEPTH=2
+Below we showed DDAR solver solving IMO 2000 P1:
 
-SEARCH_ARGS=(
-  --beam_size=$BEAM_SIZE
-  --search_depth=$DEPTH
-)
-```
-
-NOTE: The results in our paper can be obtained by setting
-`BATCH_SIZE=32`, `BEAM_SIZE=512`, `DEPTH=16`
-as described in section Methods.
-To stay under IMO time limits, 4 V100-GPUs and 250 CPU workers
-are needed as shown in Extended Data - Figure 1.
-Note that we also strip away other memory/speed optimizations
-due to internal dependencies and to promote code clarity.
-
-Assume the downloaded checkpoint and vocabulary is placed in `DATA`,
-and the installed `meliad` source code is at `MELIAD_PATH`.
-We make use of the `gin` library to manage model configurations,
-following `meliad` conventions. We now define the flags relevant to the
-language model:
-
-```shell
-LM_ARGS=(
-  --ckpt_path=$DATA \
-  --vocab_path=$DATA/geometry.757.model
-  --gin_search_paths=$MELIAD_PATH/transformer/configs,$(pwd) \
-  --gin_file=base_htrans.gin \
-  --gin_file=size/medium_150M.gin \
-  --gin_file=options/positions_t5.gin \
-  --gin_file=options/lr_cosine_decay.gin \
-  --gin_file=options/seq_1024_nocache.gin \
-  --gin_file=geometry_150M_generate.gin \
-  --gin_param=DecoderOnlyLanguageModelGenerate.output_token_losses=True \
-  --gin_param=TransformerTaskConfig.batch_size=$BATCH_SIZE \
-  --gin_param=TransformerTaskConfig.sequence_length=128 \
-  --gin_param=Trainer.restore_state_variables=False
-);
-```
-
-TIP: Note that you can still run the DDAR solver
-without defining `SEARCH_ARGS` and `LM_ARGS`.
-In such case, simply disable the import of the `lm_inference` module
-inside `alphageometry.py`.
-
-## Run DDAR
-
-The script loads a problem by reading a list of problems
-from a text file and solves the specific problem in the list according
-to its name. We pass these two pieces of information through the flags
-`--problems_file` and `--problem_name`.
-We use `--mode=ddar` to indicate that we want to use the DDAR solver.
-
-Below we showed this solver solving IMO 2000 P1:
-
-```shell
-python -m alphageometry \
---alsologtostderr \
---problems_file=$(pwd)/imo_ag_30.txt \
---problem_name=translated_imo_2000_p1 \
---mode=ddar \
-"${DDAR_ARGS[@]}"
+```batch
+python src\alphageometry.py ^
+  --problems_file=examples/imo_ag_30.txt ^
+  --problem_name=translated_imo_2000_p1
 ```
 
 Expect the following output
 
 ```shell
-graph.py:468] translated_imo_2000_p1
-graph.py:469] a b = segment a b; g1 = on_tline g1 a a b; g2 = on_tline g2 b b a; m = on_circle m g1 a, on_circle m g2 b; n = on_circle n g1 a, on_circle n g2 b; c = on_pline c m a b, on_circle c g1 a; d = on_pline d m a b, on_circle d g2 b; e = on_line e a c, on_line e b d; p = on_line p a n, on_line p c d; q = on_line q b n, on_line q c d ? cong e p e q
-ddar.py:41] Depth 1/1000 time = 1.7772269248962402
-ddar.py:41] Depth 2/1000 time = 5.63526177406311
-ddar.py:41] Depth 3/1000 time = 6.883412837982178
-ddar.py:41] Depth 4/1000 time = 10.275688409805298
-ddar.py:41] Depth 5/1000 time = 12.048273086547852
-alphageometry.py:190]
+INFO - translated_imo_2000_p1
+INFO - a b = segment a b; g1 = on_tline g1 a a b; g2 = on_tline g2 b b a; m = on_circle m g1 a, on_circle m g2 b; n = on_circle n g1 a, on_circle n g2 b; c = on_pline c m a b, on_circle c g1 a; d = on_pline d m a b, on_circle d g2 b; e = on_line e a c, on_line e b d; p = on_line p a n, on_line p c d; q = on_line q b n, on_line q c d ? cong e p e q
+INFO - Depth 1/1000 time = 1.7772269248962402
+INFO - Depth 2/1000 time = 5.63526177406311
+INFO - Depth 3/1000 time = 6.883412837982178
+INFO - Depth 4/1000 time = 10.275688409805298
+INFO - Depth 5/1000 time = 12.048273086547852
+INFO -
 ==========================
  * From theorem premises:
 A B G1 G2 M N C D E P Q : Points
@@ -194,22 +127,19 @@ will write the proof to a text file.
 Running on all problems in `imo_ag_30.txt` will yield solutions to
 14 of them, as reported in Table 1 in our paper.
 
-## Run AlphaGeometry:
+### Mode: AlphaGeometry
 
 As a simple example, we load `--problem_name=orthocenter`
 from `--problem_file=examples.txt`.
-This time, we pass `--mode=alphageometry` to use the AlphaGeometry solver
-and pass the `SEARCH_ARGS` and `LM_ARGS` flags.
+This time, we pass `--mode=alphageometry` to use the AlphaGeometry solver.
 
 ```shell
-python -m alphageometry \
---alsologtostderr \
---problems_file=$(pwd)/examples.txt \
---problem_name=orthocenter \
---mode=alphageometry \
-"${DDAR_ARGS[@]}" \
-"${SEARCH_ARGS[@]}" \
-"${LM_ARGS[@]}"
+python src/alphageometry.py ^
+    --problems_file=examples/examples.txt ^
+    --problem_name=orthocenter ^
+    --mode=alphageometry ^
+    --beam_size=2 ^
+    --search_depth=2
 ```
 
 Expect the following output:
@@ -218,31 +148,27 @@ Expect the following output:
 ...
 [log omitted]
 ...
-training_loop.py:725] Total parameters: 152072288
-training_loop.py:739] Total state size: 0
-training_loop.py:492] Training loop: creating task for mode beam_search
-
-graph.py:468] orthocenter
-graph.py:469] a b c = triangle a b c; d = on_tline d b a c, on_tline d c a b ? perp a d b c
-ddar.py:41] Depth 1/1000 time = 0.009987592697143555 branch = 4
-ddar.py:41] Depth 2/1000 time = 0.00672602653503418 branch = 0
-alphageometry.py:221] DD+AR failed to solve the problem.
-alphageometry.py:457] Depth 0. There are 1 nodes to expand:
-alphageometry.py:460] {S} a : ; b : ; c : ; d : T a b c d 00 T a c b d 01 ? T a d b c {F1} x00
-alphageometry.py:465] Decoding from {S} a : ; b : ; c : ; d : T a b c d 00 T a c b d 01 ? T a d b c {F1} x00
+INFO - orthocenter
+INFO - a b c = triangle a b c; d = on_tline d b a c, on_tline d c a b ? perp a d b c
+INFO - Depth 1/1000 time = 0.009987592697143555 branch = 4
+INFO - Depth 2/1000 time = 0.00672602653503418 branch = 0
+INFO - DD+AR failed to solve the problem.
+INFO - Depth 0. There are 1 nodes to expand:
+INFO - {S} a : ; b : ; c : ; d : T a b c d 00 T a c b d 01 ? T a d b c {F1} x00
+INFO - Decoding from {S} a : ; b : ; c : ; d : T a b c d 00 T a c b d 01 ? T a d b c {F1} x00
 ...
 [log omitted]
 ...
-alphageometry.py:470] LM output (score=-1.102287): "e : C a c e 02 C b d e 03 ;"
-alphageometry.py:471] Translation: "e = on_line e a c, on_line e b d"
+INFO - LM output (score=-1.000000): "e : C a c e 02 C b d e 03 ;"
+INFO - Translation: "e = on_line e a c, on_line e b d"
 
-alphageometry.py:480] Solving: "a b c = triangle a b c; d = on_tline d b a c, on_tline d c a b; e = on_line e a c, on_line e b d ? perp a d b c"
-graph.py:468]
-graph.py:469] a b c = triangle a b c; d = on_tline d b a c, on_tline d c a b; e = on_line e a c, on_line e b d ? perp a d b c
-ddar.py:41] Depth 1/1000 time = 0.021120786666870117
-ddar.py:41] Depth 2/1000 time = 0.033370018005371094
-ddar.py:41] Depth 3/1000 time = 0.04297471046447754
-alphageometry.py:140]
+INFO - Solving: "a b c = triangle a b c; d = on_tline d b a c, on_tline d c a b; e = on_line e a c, on_line e b d ? perp a d b c"
+INFO -
+INFO - a b c = triangle a b c; d = on_tline d b a c, on_tline d c a b; e = on_line e a c, on_line e b d ? perp a d b c
+INFO - Depth 1/1000 time = 0.021120786666870117
+INFO - Depth 2/1000 time = 0.033370018005371094
+INFO - Depth 3/1000 time = 0.04297471046447754
+INFO -
 ==========================
  * From theorem premises:
 A B C D : Points
@@ -266,7 +192,7 @@ E,C,A are collinear [03]
 009. ∠BCE = ∠ADE [10] & E,C,A are collinear [03] & E,B,D are collinear [02] & ∠EBC = ∠EAD [11] ⇒  AD ⟂ BC
 ==========================
 
-alphageometry.py:505] Solved.
+INFO - Solved.
 ```
 
 NOTE: Point `H` is automatically renamed to `D`,
@@ -274,55 +200,14 @@ as the LM is trained on synthetic problems
 where the points are named alphabetically, and so it expects
 the same during test time.
 
-NOTE: In this implementation of AlphaGeometry,
-we removed all optimizations that are dependent on
-internal infrastructure, e.g.,
-parallelized model inference on multi GPUs,
-parallelized DDAR on multiple CPUs,
-parallel execution of LM and DDAR,
-shared pool of CPU workers across different problems, etc.
-We also removed some memory/speed optimizations and code
-abstractions in favor of code clarity.
-
 As can be seen in the output, initially DDAR failed to solve the problem.
-The LM proposes two auxiliary constructions (because `BATCH_SIZE=2`):
+The LM proposes one auxiliary constructions (Note: Beam search not implemented yet):
 
-* `e = eqdistance e c a b, eqdistance e b a c`, i.e.,
-construct `E` as the intersection of circle (center=C, radius=AB) and
-circle (center=B, radius=AC). This construction has a score of `-1.186`.
 * `e = on_line e a c, on_line e b d`, i.e.,
 `E` is the intersection of `AC` and `BD`.
-This construction has a higher score (`-1.102287`) than the previous.
 
-Since the second construction has a higher score, DDAR attempted the second
-construction first and found the solution right away.
+DDAR attempted the construction and found the solution right away.
 The proof search therefore terminates and there is no second iteration.
-
-## Results
-
-Before attempting to reproduce the AlphaGeometry numbers in our paper,
-please make sure to pass all tests in the prepared test suite:
-
-```
-bash run_tests.sh
-```
-
-NOTE: [Issues#14](https://github.com/google-deepmind/alphageometry/issues/14) reports that although the top beam decodes are still the same, the LM is not giving the same score for different users.
-
-Then, pass the corresponding values for `--problem_file` (column)
-and `--mode` (row), and
-iterate on all problems to obtain the following results:
-
-<center>
-
-<b>Number of solved problems:</b>
-
-|          | `imo_ag_30.txt`  | `jgex_ag_231.txt` |
-|----------|------------------|-------------------|
-| `ddar`   | 14               | 198               |
-| `alphageometry`     | 25               | 228               |
-
-</center>
 
 ## Source code description
 
@@ -341,84 +226,26 @@ each of them and their description.
 | `ar.py`                | Implements AR and its traceback.                                                   |
 | `trace_back.py`        | Implements the recursive traceback and dependency difference algorithm.            |
 | `ddar.py`              | Implements the combination DD+AR.                                                  |
-| `beam_search.py`       | Implements beam decoding of a language model in JAX.                               |
-| `models.py`            | Implements the transformer model.                                                  |
-| `transformer_layer.py` | Implements the transformer layer.                                                  |
-| `decoder_stack.py`     | Implements the transformer decoder stack.                                          |
 | `lm_inference.py`      | Implements an interface to a trained LM to perform decoding.                       |
-| `alphageometry.py`                | Main script that loads problems, calls DD+AR or AlphaGeometry solver, and prints solutions.   |
+| `alphageometry.py`     | Main script that loads problems, calls DD+AR or AlphaGeometry solver, and prints solutions.   |
 | `pretty.py`            | Pretty formating the solutions output by solvers.                                  |
-| `*_test.py`            | Tests for the corresponding module.                                                |
-| `download.sh`          | Script to download model checkpoints and LM                                        |
-| `run.sh`               | Script to execute instructions in README.                                          |
-| `run_tests.sh`         | Script to execute the test suite.                                                  |
+| `test_xx.py`           | Tests for the corresponding module.                                                |
+| `run.sh`/`run.bat`     | Script to execute instructions in README.                                          |
+| `run_tests.sh`/`run_tests.bat` | Script to execute the test suite.                                          |
 
 
 Resource files:
 
 | Resource file name     | Description                                                                        |
 |------------------------|------------------------------------------------------------------------------------|
-| `defs.txt`             | Definitions of different geometric construction actions.                           |
-| `rules.txt`            | Deduction rules for DD.                                                            |
-| `geometry_150M_generate.gin`| Gin config of the LM implemented in meliad.                                   |
-| `imo_ag_30.txt`        | Problems in IMO-AG-30.                                                             |
-| `jgex_ag_231.txt`      | Problems in JGEX-AG-231.                                                           |
+| `data/defs.txt`             | Definitions of different geometric construction actions.                      |
+| `data/rules.txt`            | Deduction rules for DD.                                                       |
+| `examples/imo_ag_30.txt`    | Problems in IMO-AG-30.                                                        |
+| `examples/jgex_ag_231.txt`  | Problems in JGEX-AG-231.                                                      |
 
+## Original AlphaGeometry License Information
 
-
-## Citing this work
-
-```bibtex
-@Article{AlphaGeometryTrinh2024,
-  author  = {Trinh, Trieu and Wu, Yuhuai and Le, Quoc and He, He and Luong, Thang},
-  journal = {Nature},
-  title   = {Solving Olympiad Geometry without Human Demonstrations},
-  year    = {2024},
-  doi     = {10.1038/s41586-023-06747-5}
-}
-```
-
-## Acknowledgements
-
-This research is a collaboration between the Google Brain team
-(now Google Deepmind) and
-the Computer Science Department of New York University.
-We thank Rif A. Saurous, Denny Zhou, Christian Szegedy, Delesley Hutchins,
-Thomas Kipf, Hieu Pham, Petar Veličković, Debidatta Dwibedi,
-Kyunghyun Cho, Lerrel Pinto, Alfredo Canziani,
-Thomas Wies, He He’s research group,
-Evan Chen (the USA’s IMO team coach),
-Mirek Olsak, Patrik Bak,
-and all three Nature's referees for their help and support.
-
-The code of AlphaGeometry communicates with and/or references the following
-separate libraries and packages:
-
-*   [Abseil](https://github.com/abseil/abseil-py)
-*   [JAX](https://github.com/google/jax/)
-*   [matplotlib](https://matplotlib.org/)
-*   [NumPy](https://numpy.org)
-*   [SciPy](https://scipy.org)
-*   [TensorFlow](https://github.com/tensorflow/tensorflow)
-*   [Meliad](https://github.com/google-research/meliad)
-*   [Flax](https://github.com/google/flax)
-*   [Gin](https://github.com/google/gin-config)
-*   [T5](https://github.com/google-research/text-to-text-transfer-transformer)
-*   [SentencePiece](https://github.com/google/sentencepiece)
-
-
-
-We thank all their contributors and maintainers!
-
-
-## Disclaimer
-
-This is not an officially supported Google product.
-
-This research code is provided "as-is" to the broader research community.
-Google does not promise to maintain or otherwise support this code in any way.
-
-## Code License
+### Code License
 
 Copyright 2023 DeepMind Technologies Limited
 
@@ -437,7 +264,7 @@ distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
 either express or implied. See the licenses for the specific language governing
 permissions and limitations under those licenses.
 
-## Model Parameters License
+### Model Parameters License
 
 The AlphaGeometry checkpoints and vocabulary are made available
 under the terms of the Creative Commons Attribution 4.0

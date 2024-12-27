@@ -1,0 +1,18 @@
+*.obj
+
+node_modules/
+
+# linux
+*.out
+*.so
+
+# windows
+*.dll
+*.lib
+*.exe
+*.o
+*.ppu
+*.a
+
+bugs.*
+bun.*
