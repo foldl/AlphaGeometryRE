@@ -1,6 +1,6 @@
 # AlphaGeometryRE
 
-AlphaGeometryRE is an re-engineered version of [AlphaGeometry](https://github.com/google-deepmind/alphageometry) with a
+AlphaGeometryRE is a re-engineered version of [AlphaGeometry](https://github.com/google-deepmind/alphageometry) with a
 goal to [make](https://github.com/google-deepmind/alphageometry/issues/130)
 [it](https://github.com/google-deepmind/alphageometry/issues/116)
 [easy](https://github.com/google-deepmind/alphageometry/issues/96) to use (especially on [Windows](https://github.com/google-deepmind/alphageometry/issues/120)):
