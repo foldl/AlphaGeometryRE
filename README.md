@@ -5,9 +5,9 @@ goal to [make](https://github.com/google-deepmind/alphageometry/issues/130)
 [it](https://github.com/google-deepmind/alphageometry/issues/116)
 [easy](https://github.com/google-deepmind/alphageometry/issues/96) to use (especially on [Windows](https://github.com/google-deepmind/alphageometry/issues/120)):
 
-* Use [ChatLLM.cpp](http://github.com/foldl/chatllm.cpp) for LLM interference.
+* Use [ChatLLM.cpp](http://github.com/foldl/chatllm.cpp) for LM interference, no Tensorflow/Jax/Flax.
 
-* Greatly **simplified** _requirements.txt_.
+* Significantly **simplified** _requirements.txt_.
 
 * Indent with **four** spaces (🖕 two spaces).
 
@@ -37,20 +37,30 @@ introduced in the [Nature 2024](https://www.nature.com/articles/s41586-023-06747
 <img alt="fig1" width="800px" src="fig1.svg">
 </center>
 
-## Dependencies
+## Get started
 
-1. Install ChatLLM.cpp DLL (or .so whatever)
+1. Get the source code.
 
-    DLL will be contained in a release. Or, you can [build](https://github.com/foldl/chatllm.cpp/blob/master/docs/binding.md#precondition) `libchatllmb` from source,
-    and copy the DLL into `src/chatllm/bindings`.
+    Either clone this repository or download it.
 
-1. Install Python dependencies
+1. Install ChatLLM.cpp DLLs (or .so whatever).
+
+    You can find prebuilt DLLs in releases. Or, you can [build](https://github.com/foldl/chatllm.cpp/blob/master/docs/binding.md#precondition) `libchatllmb` from source.
+    Copy these DLLs into `src/chatllm/bindings`.
+
+1. Install Python dependencies.
 
     ```sh
     pip install -r requirements.txt
     ```
 
     Optionally, you can create a virtual environment, and then install dependencies into it.
+
+1. Run `run_tests.bat` to check if everything is Ok.
+
+    The language model will be downloaded automatically.
+
+1. Run `test.bat` to solve a IMO problem with the AlphaGeometry solver.
 
 ## Command line flags
 
@@ -125,7 +135,7 @@ TIP: Additionally passing the flag `--out_file=path/to/output/text/file.txt`
 will write the proof to a text file.
 
 Running on all problems in `imo_ag_30.txt` will yield solutions to
-14 of them, as reported in Table 1 in our paper.
+14 of them, as reported in Table 1 in the paper.
 
 ### Example of AlphaGeometry
 
@@ -201,7 +211,8 @@ where the points are named alphabetically, and so it expects
 the same during test time.
 
 As can be seen in the output, initially DDAR failed to solve the problem.
-The LM proposes one auxiliary constructions (Note: Beam search not implemented yet):
+The LM proposes one auxiliary construction (Note: Beam search not implemented yet,
+and LM will propose only one auxiliary construction.):
 
 * `e = on_line e a c, on_line e b d`, i.e.,
 `E` is the intersection of `AC` and `BD`.
@@ -230,7 +241,7 @@ each of them and their description.
 | `alphageometry.py`     | Main script that loads problems, calls DD+AR or AlphaGeometry solver, and prints solutions.   |
 | `pretty.py`            | Pretty formating the solutions output by solvers.                                  |
 | `test_xx.py`           | Tests for the corresponding module.                                                |
-| `run.sh`/`run.bat`     | Script to execute instructions in README.                                          |
+| `run.sh`/`run.bat`     | Script to run a demo in README.                                                    |
 | `run_tests.sh`/`run_tests.bat` | Script to execute the test suite.                                          |
 
 
