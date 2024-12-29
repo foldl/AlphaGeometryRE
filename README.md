@@ -5,7 +5,7 @@ goal to [make](https://github.com/google-deepmind/alphageometry/issues/130)
 [it](https://github.com/google-deepmind/alphageometry/issues/116)
 [easy](https://github.com/google-deepmind/alphageometry/issues/96) to use (especially on [Windows](https://github.com/google-deepmind/alphageometry/issues/120)):
 
-* Use [ChatLLM.cpp](http://github.com/foldl/chatllm.cpp) for LM interference, no Tensorflow/Jax/Flax.
+* Use [ChatLLM.cpp](http://github.com/foldl/chatllm.cpp) for LM inference, no Tensorflow/Jax/Flax.
 
 * Significantly **simplified** _requirements.txt_.
 
