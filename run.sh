@@ -6,6 +6,7 @@ DDAR_ARGS=(
 );
 
 SEARCH_ARGS=(
+  --batch_size=2
   --beam_size=2
   --search_depth=2
 )

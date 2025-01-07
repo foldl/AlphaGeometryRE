@@ -41,21 +41,20 @@ class LmInferenceTest(unittest.TestCase):
     super().setUpClass()
 
     cls.loaded_lm = lm.LanguageModelInference(
-        model_file=FLAGS.model, mode='beam_search'
+        model_file=FLAGS.model, mode='beam_search', batch_size=2
     )
 
   def test_lm_decode(self):
-    print(f"TODO: beam search")
     outputs = LmInferenceTest.loaded_lm.beam_decode(
         '{S} a : ; b : ; c : ; d : T a b c d 00 T a c b d 01 ? T a d b c'
         ' {F1} x00',
         eos_tokens=[';'],
     )
-    for r in outputs['seqs_str']:
-        self.assertIn(
-            r,
-            ['e : D a b c e 02 D a c b e 03 ;', 'e : C a c e 02 C b d e 03 ;'],
-        )
+
+    self.assertEqual(
+        sorted(outputs['seqs_str']),
+        sorted(['e : D a b c e 02 D a c b e 03 ;', 'e : C a c e 02 C b d e 03 ;']),
+    )
 
 if __name__ == '__main__':
   parse_args()

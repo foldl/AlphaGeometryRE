@@ -16,12 +16,9 @@ class CallableLLM(chatllm.ChatLLM):
 class LanguageModelInference:
     """Meliad wrapper for LM inference."""
 
-    def __init__(self, model_file: str, mode='beam_search'):
+    def __init__(self, model_file: str, mode='beam_search', batch_size=2):
         self.mode = mode
-        self.llm = CallableLLM(chatllm.LibChatLLM(binding.PATH_BINDS), ['--hide_banner', '-m', model_file, ])
-
-    def call(self):
-        return None
+        self.llm = CallableLLM(chatllm.LibChatLLM(binding.PATH_BINDS), ['--hide_banner', '-m', model_file, '--beam_size', str(batch_size)])
 
     def beam_decode(
         self,
@@ -30,9 +27,11 @@ class LanguageModelInference:
     ):
         assert eos_tokens == [';'], "eos_tokens must be [';']"
 
-        r = self.llm.chat(inputs).strip()
+        self.llm.chat(inputs)
+
+        results = self.llm.beam_search_results
 
         return {
-            'seqs_str': [r],
-            'scores': [-1.0],
+            'seqs_str': [r['str'].strip() for r in results],
+            'scores': [r['score'] for r in results],
         }

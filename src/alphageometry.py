@@ -31,7 +31,8 @@ import argparse
 
 DEFINITIONS = None  # contains definitions of construction actions
 RULES = None  # contains rules of deductions
-
+PLOT = True
+LM = None
 
 def natural_language_statement(logical_statement: pr.Dependency) -> str:
     """Convert logical_statement to natural language.
@@ -143,15 +144,18 @@ def write_solution(g: gh.Graph, p: pr.Problem, out_file: str) -> None:
     solution += '==========================\n'
     logging.info(solution)
     if out_file:
-        with open(out_file, 'w') as f:
+        with open(out_file, 'w', encoding='utf8') as f:
             f.write(solution)
         logging.info('Solution written to %s.', out_file)
 
 
-def get_lm(model_file: str) -> lm.LanguageModelInference:
-    return lm.LanguageModelInference(
-        model_file=model_file, mode='beam_search'
-    )
+def get_lm(model_file: str, batch_size: int) -> lm.LanguageModelInference:
+    global LM
+    if LM is None:
+        LM = lm.LanguageModelInference(
+            model_file=model_file, mode='beam_search', batch_size=batch_size
+        )
+    return LM
 
 def run_ddar(g: gh.Graph, p: pr.Problem, out_file: str) -> bool:
     """Run DD+AR.
@@ -173,11 +177,13 @@ def run_ddar(g: gh.Graph, p: pr.Problem, out_file: str) -> bool:
 
     write_solution(g, p, out_file)
 
-    gh.nm.draw(
-        g.type2nodes[gh.Point],
-        g.type2nodes[gh.Line],
-        g.type2nodes[gh.Circle],
-        g.type2nodes[gh.Segment])
+    global PLOT
+    if PLOT:
+        gh.nm.draw(
+            g.type2nodes[gh.Point],
+            g.type2nodes[gh.Line],
+            g.type2nodes[gh.Circle],
+            g.type2nodes[gh.Segment])
     return True
 
 
@@ -511,8 +517,8 @@ def run_alphageometry(
             candidates = zip(outputs['seqs_str'],
                              translations, outputs['scores'])
 
-            # bring the highest scoring candidate first
-            candidates = reversed(list(candidates))
+            # sort candidates by scores
+            candidates = sorted(list(candidates), key=lambda x: x[2], reverse=True)
 
             for lm_out, translation, score in candidates:
                 logging.info('LM output (score=%f): "%s"', score, lm_out)
@@ -554,13 +560,12 @@ def run_alphageometry(
 
     return False
 
-
 def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--problems_file',
         type=str,
-        default='imo_ag_30.txt',
+        default='examples\imo_ag_30.txt',
         help='text file contains the problem strings. See imo_ag_30.txt for example.')
 
     parser.add_argument(
@@ -600,25 +605,28 @@ def parse_args():
         help='path to the solution output file.')
 
     parser.add_argument(
+        '--batch_size',
+        type=int,
+        default=2,
+        help='batch size (i.e. beam size) of LLM.')
+
+    parser.add_argument(
         '--beam_size',
         type=int,
-        default=1,
+        default=2,
         help='beam size of the proof search.')
 
     parser.add_argument(
         '--search_depth',
         type=int,
-        default=1,
+        default=2,
         help='search depth of the proof search.')
 
     return parser.parse_args()
 
-
-def main():
+def main(FLAGS):
     global DEFINITIONS
     global RULES
-
-    FLAGS = parse_args()
 
     # definitions of terms used in our domain-specific language.
     DEFINITIONS = pr.Definition.from_txt_file(FLAGS.defs_file, to_dict=True)
@@ -651,7 +659,7 @@ def main():
         run_ddar(g, this_problem, FLAGS.out_file)
 
     elif FLAGS.mode == 'alphageometry':
-        model = get_lm(FLAGS.model)
+        model = get_lm(FLAGS.model, FLAGS.batch_size)
         run_alphageometry(
             model,
             this_problem,
@@ -667,7 +675,17 @@ def main():
 if __name__ == '__main__':
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        format='%(asctime)s - %(levelname)s - %(message)s',
         handlers=[logging.StreamHandler(sys.stdout)]
     )
-    main()
+    FLAGS = parse_args()
+
+    if FLAGS.problem_name != '':
+        main(FLAGS)
+    else:
+        PLOT = False
+        out_file = FLAGS.out_file
+        for name in pr.Problem.from_txt_file(FLAGS.problems_file, to_dict=True).keys():
+            FLAGS.problem_name = name
+            FLAGS.out_file = f"{out_file}/{name}.txt" if out_file != '' else ''
+            main(FLAGS)

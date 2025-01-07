@@ -13,9 +13,7 @@ goal to [make](https://github.com/google-deepmind/alphageometry/issues/130)
 
 Plan:
 
-* [ ] LM Beam search.
-
-    Note: Since beam search is not implemented yet, full results of the paper might not be achieved.
+* [x] LM Beam search.
 
 * [ ] A new description language like [this](https://reference.wolfram.com/legacy/language/v14/guide/PlaneGeometry.html).
 
@@ -83,9 +81,15 @@ A list of command line flags.
 
     Defaults to `data\defs` & `data\rules.txt` respectively.
 
-* `--beam_size`: beam size of the proof search. (default: 1)
+* `--batch_size`: beam size of the proof search. (default: 2)
 
-* `--search_depth`: search depth of the proof search. (default: 1)
+* `--beam_size`: beam size of the proof search. (default: 2)
+
+* `--search_depth`: search depth of the proof search. (default: 2)
+
+NOTE: The results in the paper can be obtained by setting
+`--batch_size=32`, `--beam_size=512`, `--search_depth=16`.
+But, not confirmed yet.
 
 ### Example of DDAR
 
@@ -169,7 +173,7 @@ INFO - Decoding from {S} a : ; b : ; c : ; d : T a b c d 00 T a c b d 01 ? T a d
 ...
 [log omitted]
 ...
-INFO - LM output (score=-1.000000): "e : C a c e 02 C b d e 03 ;"
+INFO - LM output (score=-0.017550): "e : C a c e 02 C b d e 03 ;"
 INFO - Translation: "e = on_line e a c, on_line e b d"
 
 INFO - Solving: "a b c = triangle a b c; d = on_tline d b a c, on_tline d c a b; e = on_line e a c, on_line e b d ? perp a d b c"
@@ -211,14 +215,20 @@ where the points are named alphabetically, and so it expects
 the same during test time.
 
 As can be seen in the output, initially DDAR failed to solve the problem.
-The LM proposes one auxiliary construction (Note: Beam search not implemented yet,
-and LM will propose only one auxiliary construction.):
+The LM proposes two auxiliary constructions (because `--batch_size=2`):
 
 * `e = on_line e a c, on_line e b d`, i.e.,
 `E` is the intersection of `AC` and `BD`.
+This construction has a score of `-0.017550`.
 
-DDAR attempted the construction and found the solution right away.
-The proof search therefore terminates and there is no second iteration.
+* `e = eqdistance e c a b, eqdistance e b a c`, i.e.,
+construct `E` as the intersection of circle (center=C, radius=AB) and
+circle (center=B, radius=AC). This construction has a lower score (`-4.05149`)
+than the previous.
+
+Since the first construction has a higher score, DDAR attempted it first and
+found the solution right away. The proof search therefore terminates and
+there is no second iteration.
 
 ## Source code description
 
