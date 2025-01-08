@@ -734,7 +734,7 @@ def match_eqratio6_coll_ncoll_eqangle6(
     records = set()
     for b, d, c in g_matcher('coll'):
         for a in g.all_points():
-            if g.check_coll([a, b, c]):
+            if not g.check_ncoll([a, b, c]):
                 continue
             if (a, b, d, c) in records or (a, c, d, b) in records:
                 continue
@@ -753,7 +753,7 @@ def match_eqangle6_coll_ncoll_eqratio6(
     records = set()
     for b, d, c in g_matcher('coll'):
         for a in g.all_points():
-            if g.check_coll([a, b, c]):
+            if not g.check_ncoll([a, b, c]):
                 continue
             if (a, b, d, c) in records or (a, c, d, b) in records:
                 continue
