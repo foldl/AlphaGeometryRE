@@ -337,6 +337,10 @@ def try_translate_constrained_to_construct(string: str, g: gh.Graph) -> str:
     if string[-1] != ';':
         return 'ERROR: must end with ;'
 
+    parts = string.split(' : ')
+    if len(parts) != 2:
+        return 'ERROR: too many `:` separated parts'
+
     head, prem_str = string.split(' : ')
     point = head.strip()
 
@@ -686,6 +690,7 @@ if __name__ == '__main__':
         PLOT = False
         out_file = FLAGS.out_file
         for name in pr.Problem.from_txt_file(FLAGS.problems_file, to_dict=True).keys():
+            if name.startswith('#'): continue
             FLAGS.problem_name = name
             FLAGS.out_file = f"{out_file}/{name}.txt" if out_file != '' else ''
             main(FLAGS)
