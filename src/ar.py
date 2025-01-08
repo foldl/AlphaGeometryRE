@@ -425,8 +425,8 @@ class Table:
     def add_eq2(
         self, a: str, b: str, m: float, n: float, dep: pr.Dependency
     ) -> None:
-        # a/b = m/n
-        if not self.add_expr([(a, m), (b, -n)]):
+        # a/b = m/n, ie. a * n - b * m = 0
+        if not self.add_expr([(a, n), (b, -m)]):
             return []
         self.register2(a, b, m, n, dep)
 
