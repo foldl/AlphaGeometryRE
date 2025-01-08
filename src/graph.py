@@ -286,7 +286,7 @@ class Graph:
         if not self.is_equal(cd_ab, dn):
             args = [c, d, a, b, dn]
             dep2 = deps.populate('rconst', args)
-            dep2.algebra = cd._val, ab._val, num, den
+            dep2.algebra = cd._val, ab._val, den, num
             self.make_equal(dn, cd_ab, deps=dep2)
             self.cache_dep('rconst', [c, d, a, b, dn], dep2)
             add += [dep2]
