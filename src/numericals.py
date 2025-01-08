@@ -1240,8 +1240,10 @@ def draw(
         ymax = max([p.num.y for p in points])
         plt.margins((xmax - xmin) * 0.1, (ymax - ymin) * 0.1)
 
-    plt.show(block=block)
-
+    if save_to is None:
+        plt.show(block=block)
+    else:
+        plt.savefig(save_to)
 
 def close_enough(a: float, b: float, tol: float = 1e-12) -> bool:
     return abs(a - b) < tol

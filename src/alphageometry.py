@@ -31,7 +31,6 @@ import argparse
 
 DEFINITIONS = None  # contains definitions of construction actions
 RULES = None  # contains rules of deductions
-PLOT = True
 LM = None
 
 def natural_language_statement(logical_statement: pr.Dependency) -> str:
@@ -177,13 +176,12 @@ def run_ddar(g: gh.Graph, p: pr.Problem, out_file: str) -> bool:
 
     write_solution(g, p, out_file)
 
-    global PLOT
-    if PLOT:
-        gh.nm.draw(
-            g.type2nodes[gh.Point],
-            g.type2nodes[gh.Line],
-            g.type2nodes[gh.Circle],
-            g.type2nodes[gh.Segment])
+    gh.nm.draw(
+        g.type2nodes[gh.Point],
+        g.type2nodes[gh.Line],
+        g.type2nodes[gh.Circle],
+        g.type2nodes[gh.Segment],
+        save_to=(out_file + '.png' if out_file != '' else None))
     return True
 
 
@@ -687,7 +685,6 @@ if __name__ == '__main__':
     if FLAGS.problem_name != '':
         main(FLAGS)
     else:
-        PLOT = False
         out_file = FLAGS.out_file
         for name in pr.Problem.from_txt_file(FLAGS.problems_file, to_dict=True).keys():
             if name.startswith('#'): continue
