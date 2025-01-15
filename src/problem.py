@@ -146,9 +146,8 @@ class Problem:
     ):
         """Load a problem from a text file."""
         with open(fname, 'r') as f:
-            lines = f.read().split('\n')
+            lines = f.read().splitlines()
 
-        lines = [l for l in lines if l]
         data = [
             cls.from_txt(url + '\n' + problem, translate)
             for (url, problem) in reshape(lines, 2)
@@ -302,12 +301,13 @@ class Definition:
     @classmethod
     def from_txt_file(cls, fname: str, to_dict: bool = False) -> Definition:
         with open(fname, 'r') as f:
-            lines = f.read()
+            lines = f.read().splitlines()
         return cls.from_string(lines, to_dict)
 
     @classmethod
-    def from_string(cls, string: str, to_dict: bool = False) -> Definition:
-        lines = string.split('\n')
+    def from_string(cls, lines: list[str], to_dict: bool = False) -> Definition:
+        if len(lines) % 6 == 5:
+            lines.append('')
         data = [cls.from_txt('\n'.join(group)) for group in reshape(lines, 6)]
         if to_dict:
             return cls.to_dict(data)
@@ -380,13 +380,12 @@ class Theorem:
     @classmethod
     def from_txt_file(cls, fname: str, to_dict: bool = False) -> Theorem:
         with open(fname, 'r') as f:
-            theorems = f.read()
+            theorems = f.read().splitlines()
         return cls.from_string(theorems, to_dict)
 
     @classmethod
-    def from_string(cls, string: str, to_dict: bool = False) -> Theorem:
+    def from_string(cls, theorems: list[str], to_dict: bool = False) -> Theorem:
         """Load deduction rule from a str object."""
-        theorems = string.split('\n')
         theorems = [l for l in theorems if l and not l.startswith('#')]
         theorems = [cls.from_txt(l) for l in theorems]
 
