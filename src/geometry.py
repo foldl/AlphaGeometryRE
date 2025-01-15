@@ -60,8 +60,6 @@ class Node:
         self._val = None
         self._obj = None
 
-        self.deps = []
-
         # numerical representation.
         self.num = None
         self.change = set()  # what other nodes' num rely on this node?
