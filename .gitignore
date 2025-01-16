@@ -1,3 +1,6 @@
 __pycache__/
 .Python
 src/chatllm/quantized
+*.exe
+new/testresults/
+new/nimcache/
