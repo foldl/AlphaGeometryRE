@@ -15,7 +15,7 @@ type
         val: Node[DepsT]
         obj: Node[DepsT]
 
-        num: Node[DepsT]
+        num*: RootRef
         change: HashSet[Node[DepsT]]
 
     Point*[DepsT] = ref object of Node[DepsT]
