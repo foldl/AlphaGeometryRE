@@ -1,9 +1,24 @@
+# Copyright 2025 github/foldl
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
+
 import std/math
-from std/fenv import epsilon
 from std/random import rand
 import std/[strformat, options, random, sequtils, sugar]
 
-import  geometry as gm
+import geometry as gm
+import n_utils
 
 const ATOM = 1e-12
 
@@ -485,13 +500,6 @@ proc check_too_far*(newpoints, points: openArray[Point]; tol: float = 4): bool =
         if p.distance(avg) > maxdist * tol:
             return true
     return false
-
-func seq2tuple2*[T](args: openArray[T]): (T, T) = (args[0], args[1])
-func seq2tuple3*[T](args: openArray[T]): (T, T, T) = (args[0], args[1], args[2])
-func seq2tuple4*[T](args: openArray[T]): (T, T, T, T) = (args[0], args[1], args[2], args[3])
-func seq2tuple5*[T](args: openArray[T]): (T, T, T, T, T) = (args[0], args[1], args[2], args[3], args[4])
-func seq2tuple6*[T](args: openArray[T]): (T, T, T, T, T, T) = (args[0], args[1], args[2], args[3], args[4], args[5])
-func seq2tuple8*[T](args: openArray[T]): (T, T, T, T, T, T, T, T) = (args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7])
 
 proc check_aconst*(args: seq[RootRef]): bool =
     var (ra, rb, rc, rd, rnum, rden) = seq2tuple6(args)

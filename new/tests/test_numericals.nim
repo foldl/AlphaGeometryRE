@@ -5,6 +5,7 @@ import sets
 import std/[algorithm, strformat, math, random, options]
 
 import ../numericals as nm
+import ../n_utils
 
 proc assertEqual[A, B](a: A; b: B) =
     assert a == b, fmt"{a} != {b}"
@@ -51,7 +52,7 @@ proc test_sketch_2l1c() =
     assertAlmostEqual(i.distance(x), i.distance(z))
 
 proc test_sketch_3peq() =
-    let (a, b, c) = seq2tuple3(random_points(3))
+    let (a, b, c) = seq2tuple3 random_points(3)
     let (x, y, z) = nm.sketch_3peq([a, b, c])
 
     assert(check_coll([a, b, x]))

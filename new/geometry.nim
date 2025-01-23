@@ -1,3 +1,18 @@
+# Copyright 2025 github/foldl
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
+
 import std/tables
 from std/sequtils import zip
 import sets
@@ -18,6 +33,8 @@ type
         num*: RootRef
         change: HashSet[Node[DepsT]]
 
+        new_name: string = ""
+
     Point*[DepsT] = ref object of Node[DepsT]
 
     Line*[DepsT] = ref object of Node[DepsT]
@@ -29,7 +46,7 @@ type
     Direction*[DepsT] = ref object of Node[DepsT]
 
     Angle*[DepsT] = ref object of Node[DepsT]
-        d: tuple[n1: Node[DepsT], n2: Node[DepsT]]
+        d: tuple[n1: Direction[DepsT], n2: Direction[DepsT]]
 
     Measure*[DepsT] = ref object of Node[DepsT]
 
@@ -37,6 +54,7 @@ type
         d: tuple[n1: Node[DepsT], n2: Node[DepsT]]
 
     Ratio*[DepsT] = ref object of Node[DepsT]
+        l: (Length[DepsT], Length[DepsT])
 
     Value*[DepsT] = ref object of Node[DepsT]
 
