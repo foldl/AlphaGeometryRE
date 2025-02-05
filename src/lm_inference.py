@@ -1,6 +1,31 @@
 from typing import Any, Dict
 from chatllm.bindings import chatllm
 from chatllm.scripts import binding
+import math
+
+# Beam search parameters
+BEAM_SEARCH_DEFAULT_ALPHA = 0.6
+MAX_DECODE_LEN = 32
+
+# Brevity penalty parameters
+BREVITY_LEN_BIAS_NUMERATOR = 5.0
+BREVITY_LEN_BIAS_DENOMINATOR = 6.0
+
+
+def brevity_penalty(length: int, alpha: float = BEAM_SEARCH_DEFAULT_ALPHA):
+  """Brevity penalty function for beam search penalizing short sequences.
+
+  Args:
+    alpha: float: brevity-penalty scaling parameter.
+    length: int: length of considered sequence.
+
+  Returns:
+    Brevity penalty score as jax scalar.
+  """
+  return math.pow(
+      ((BREVITY_LEN_BIAS_NUMERATOR + length) / BREVITY_LEN_BIAS_DENOMINATOR),
+      alpha,
+  )
 
 class CallableLLM(chatllm.ChatLLM):
 
@@ -33,5 +58,5 @@ class LanguageModelInference:
 
         return {
             'seqs_str': [r['str'].strip() for r in results],
-            'scores': [r['score'] for r in results],
+            'scores': [r['score'] / brevity_penalty(len(self.llm.text_tokenize(r['str'].strip()))) for r in results],
         }
