@@ -28,6 +28,7 @@ import lm_inference as lm
 import pretty as pt
 import problem as pr
 import argparse
+import time
 
 DEFINITIONS = None  # contains definitions of construction actions
 RULES = None  # contains rules of deductions
@@ -567,7 +568,7 @@ def parse_args():
     parser.add_argument(
         '--problems_file',
         type=str,
-        default='examples\imo_ag_30.txt',
+        default='examples/imo_ag_30.txt',
         help='text file contains the problem strings. See imo_ag_30.txt for example.')
 
     parser.add_argument(
@@ -682,6 +683,7 @@ if __name__ == '__main__':
     )
     FLAGS = parse_args()
 
+    start_time = time.perf_counter()
     if FLAGS.problem_name != '':
         main(FLAGS)
     else:
@@ -690,4 +692,10 @@ if __name__ == '__main__':
             if name.startswith('#'): continue
             FLAGS.problem_name = name
             FLAGS.out_file = f"{out_file}/{name}.txt" if out_file != '' else ''
-            main(FLAGS)
+            try:
+                main(FLAGS)
+            except Exception as e:
+                print(f"exception occurred on {name}:\n{e}")
+
+    elapsed_time = time.perf_counter() - start_time
+    logging.info(f"Total time = {elapsed_time:.4f} seconds")
