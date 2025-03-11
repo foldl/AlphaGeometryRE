@@ -11,11 +11,19 @@ goal to [make](https://github.com/google-deepmind/alphageometry/issues/130)
 
 * Indent with **four** spaces (🖕 two spaces).
 
-Plan:
+Plan/Roadmap:
 
 * [x] LM Beam search.
 
+* [ ] Rewrite in Nim.
+
 * [ ] A new description language like [this](https://reference.wolfram.com/legacy/language/v14/guide/PlaneGeometry.html).
+
+* [ ] Catch up with AlphaGeometry2.
+
+## Documentation
+
+
 
 --------
 
@@ -75,7 +83,7 @@ A list of command line flags.
 
 * `--problem_name`: name of a problem in the given problem file
 
-    Example: `--problems_file orthocenter`. `orthocenter` is a problem in `examples\examples.txt`.
+    Example: `--problem_name orthocenter`. `orthocenter` is a problem in `examples\examples.txt`.
 
 * `--defs_file` & `--rules_file`: definitions & deduction rules.
 
