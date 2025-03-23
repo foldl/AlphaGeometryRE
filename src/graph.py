@@ -83,11 +83,39 @@ class DepCheckFailError(Exception):
 
 
 class PointTooCloseError(Exception):
-    pass
+    def __init__(self, clause, message="Point is too close", details=None):
+        """
+        :param clause: A problem.Clause object that identifies the conflicting clause.
+        :param message: A short description of the error.
+        :param details: Additional error details (optional).
+        """
+        self.clause = clause  # store the clause object
+        self.details = details
+        # Use clause.txt() to retrieve the text description of the conflicting clause.
+        conflict_text = clause.txt() if clause is not None else "Unknown conflicting clause"
+        # Construct the complete error message
+        full_message = f"{message}. Conflicting clause: {conflict_text}"
+        if details:
+            full_message += f" Details: {details}"
+        super().__init__(full_message)
 
 
 class PointTooFarError(Exception):
-    pass
+    def __init__(self, clause, message="Point is too far", details=None):
+        """
+        :param clause: A problem.Clause object that identifies the conflicting clause.
+        :param message: A short description of the error.
+        :param details: Additional error details (optional).
+        """
+        self.clause = clause  # store the clause object
+        self.details = details
+        # Use clause.txt() to retrieve the text description of the conflicting clause.
+        conflict_text = clause.txt() if clause is not None else "Unknown conflicting clause"
+        # Construct the complete error message
+        full_message = f"{message}. Conflicting clause: {conflict_text}"
+        if details:
+            full_message += f" Details: {details}"
+        super().__init__(full_message)
 
 
 class Graph:
@@ -517,8 +545,9 @@ class Graph:
                 continue
             except DepCheckFailError:
                 continue
-            except (PointTooCloseError, PointTooFarError):
-                continue
+            except (PointTooCloseError, PointTooFarError) as e:
+                logging.error(e)
+                exit()
 
             if not pr.goal:
                 break
@@ -2648,9 +2677,9 @@ class Graph:
 
         # check two things.
         if nm.check_too_close(nums, existing_points):
-            raise PointTooCloseError()
+            raise PointTooCloseError(clause)
         if nm.check_too_far(nums, existing_points):
-            raise PointTooFarError()
+            raise PointTooFarError(clause)
 
         # Commit: now that all conditions are passed.
         # add these points to current graph.
