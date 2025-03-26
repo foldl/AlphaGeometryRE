@@ -8,3 +8,5 @@ euler
 a b c = triangle a b c; h = orthocenter a b c; h1 = foot a b c; h2 = foot b c a; h3 = foot c a b; g1 g2 g3 g = centroid g1 g2 g3 g a b c; o = circle a b c ? coll h g o
 p_0
 a b c = triangle a b c; o = circle o a b c; i = incenter i a b c; d = foot d i b c; e = foot e i a c; f = foot f i a b; x = on_pline x d a i, on_line x a b; y = on_pline y d a i, on_line y a c; m1 = midpoint m1 x f; m2 = midpoint m2 y e; q = on_circle q m1 x, on_circle q m2 y ? cyclic q a c b
+imo_team_selection_p_2
+a b c = triangle a b c; o = circumcenter o a b c; d = on_tline d b a c, on_tline d c a b; m = midpoint m o d; e = midpoint e b c; p = on_circle p m e; q = on_tline q p a p, on_line q b c; x = on_tline x a a q, on_line x p q; z = midpoint z a q ? perp x d e z
