@@ -1599,6 +1599,13 @@ def sketch_cc_tangent(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
     return x, y, z, t
 
 
+def sketch_cc_tangent0(args: tuple[gm.Point, ...]) -> tuple[Point, ...]:
+    """Sketch tangents to two circles."""
+    x, y, _z, _t = sketch_cc_tangent(args)
+
+    return x, y
+
+
 def sketch_hcircle(args: tuple[gm.Point, ...]) -> HoleCircle:
     a, b = args
     return HoleCircle(center=a, radius=a.distance(b), hole=b)
