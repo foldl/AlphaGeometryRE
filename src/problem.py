@@ -59,7 +59,10 @@ class Construction:
         self.args = args
 
     def translate(self, mapping: dict[str, str]) -> Construction:
-        args = [a if isint(a) else mapping[a] for a in self.args]
+        try:
+            args = [a if isint(a) else mapping[a] for a in self.args]
+        except KeyError as e:
+            raise KeyError(f'Key `{e}` not found when translating `{self.txt()}`') from e
         return Construction(self.name, args)
 
     def txt(self) -> str:
@@ -73,7 +76,10 @@ class Clause:
     def from_txt(cls, data: str) -> Clause:
         if data == ' =':
             return Clause([], [])
-        points, constructions = data.split(' = ')
+        try:
+            points, constructions = data.split(' = ')
+        except ValueError:
+            raise ValueError(f'Invalid clause: {data}')
         return Clause(
             points.split(' '),
             [Construction.from_txt(c) for c in constructions.split(', ')],
