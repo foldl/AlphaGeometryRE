@@ -2,7 +2,7 @@ from ctypes import *
 from enum import IntEnum
 import os, sys, signal, queue
 import threading
-import json
+import json, base64
 from typing import Any, Iterable, List, Union
 
 try:
@@ -28,8 +28,18 @@ class PrintType(IntEnum):
                                     # (space): None; D: Debug; I: Info; W: Warn; E: Error; .: continue
     PRINTLN_BEAM_SEARCH     =12,    # print a whole line: a result of beam search with a prefix of probability
                                     # (example: "0.8,....")
+    PRINTLN_MODEL_INFO      =13,    # when a model is started, print a whole line of basic model information (json format)
+                                    # (example: {"name": "llama", "context_length": 100, "capabilities": [text, ...], ...})
+    PRINT_THOUGHT_CHUNK     =14,    # same as PRINT_CHAT_CHUNK, but this from "thoughts".
+                                    # possible leading or trailing tags (such as <think>, </think>) are removed.
+                                    # use `+detect_thoughts` to enable this.
 
-    PRINT_EVT_ASYNC_COMPLETED  = 100,   # last async operation completed (utf8_str is null)
+    PRINT_EVT_ASYNC_COMPLETED       = 100,   # last async operation completed (utf8_str is null)
+    PRINT_EVT_THOUGHT_COMPLETED     = 101,   # thought completed
+
+class EmbeddingPurpose(IntEnum):
+    Document = 0,                   # for document
+    Query    = 1,                   # for query
 
 class LibChatLLM:
 
@@ -46,7 +56,11 @@ class LibChatLLM:
         init_params = ['--ggml_dir', lib] + init_params
         lib = os.path.join(lib, 'libchatllm.')
         if sys.platform == 'win32':
+            import re
             lib = lib + 'dll'
+            for path in os.getenv('PATH').split(';'):
+                if re.match(r'.+\\CUDA\\v[0-9]+\.[0-9]+\\bin', path) is not None:
+                    os.add_dll_directory(path)
         elif sys.platform == 'darwin':
             lib = lib + 'dylib'
         else:
@@ -90,8 +104,15 @@ class LibChatLLM:
         self._chatllm_show_statistics   = self._lib.chatllm_show_statistics
         self._chatllm_save_session      = self._lib.chatllm_save_session
         self._chatllm_load_session      = self._lib.chatllm_load_session
+        self._chatllm_multimedia_msg_prepare        = self._lib.chatllm_multimedia_msg_prepare
+        self._chatllm_multimedia_msg_append         = self._lib.chatllm_multimedia_msg_append
+        self._chatllm_user_input_multimedia_msg     = self._lib.chatllm_user_input_multimedia_msg
 
-        self._chatllm_async_user_input  = self._lib.chatllm_async_user_input
+        self._chatllm_async_user_input      = self._lib.chatllm_async_user_input
+        self._chatllm_async_ai_continue     = self._lib.chatllm_async_ai_continue
+        self._chatllm_async_tool_input      = self._lib.chatllm_async_tool_input
+        self._chatllm_async_tool_completion = self._lib.chatllm_async_tool_completion
+        self._chatllm_async_user_input_multimedia_msg = self._lib.chatllm_async_user_input_multimedia_msg
 
         self._chatllm_create.restype = c_void_p
         self._chatllm_create.argtypes = []
@@ -107,20 +128,35 @@ class LibChatLLM:
 
         self._chatllm_ai_continue.restype = c_int
         self._chatllm_ai_continue.argtypes = [c_void_p, c_char_p]
+        self._chatllm_async_ai_continue.restype = c_int
+        self._chatllm_async_ai_continue.argtypes = [c_void_p, c_char_p]
+
+        self._chatllm_multimedia_msg_prepare.argtypes = [c_void_p]
+        self._chatllm_multimedia_msg_append.restype = c_int
+        self._chatllm_multimedia_msg_append.argtypes = [c_void_p, c_char_p, c_char_p]
 
         self._chatllm_user_input.restype = c_int
         self._chatllm_user_input.argtypes = [c_void_p, c_char_p]
         self._chatllm_async_user_input.restype = c_int
         self._chatllm_async_user_input.argtypes = [c_void_p, c_char_p]
 
+        self._chatllm_user_input_multimedia_msg.restype         = c_int
+        self._chatllm_user_input_multimedia_msg.argtypes        = [c_void_p]
+        self._chatllm_async_user_input_multimedia_msg.restype   = c_int
+        self._chatllm_async_user_input_multimedia_msg.argtypes  = [c_void_p]
+
         self._chatllm_tool_input.restype = c_int
         self._chatllm_tool_input.argtypes = [c_void_p, c_char_p]
+        self._chatllm_async_tool_input.restype = c_int
+        self._chatllm_async_tool_input.argtypes = [c_void_p, c_char_p]
 
         self._chatllm_tool_completion.restype = c_int
         self._chatllm_tool_completion.argtypes = [c_void_p, c_char_p]
+        self._chatllm_async_tool_completion.restype = c_int
+        self._chatllm_async_tool_completion.argtypes = [c_void_p, c_char_p]
 
         self._chatllm_text_embedding.restype = c_int
-        self._chatllm_text_embedding.argtypes = [c_void_p, c_char_p]
+        self._chatllm_text_embedding.argtypes = [c_void_p, c_char_p, c_int]
 
         self._chatllm_text_tokenize.restype = c_int
         self._chatllm_text_tokenize.argtypes = [c_void_p, c_char_p]
@@ -188,6 +224,8 @@ class LibChatLLM:
             obj.callback_print_beam_search(txt)
         elif print_type == PrintType.PRINT_EVT_ASYNC_COMPLETED.value:
             obj.callback_async_done()
+        elif print_type == PrintType.PRINTLN_MODEL_INFO.value:
+            obj._model_info = json.loads(txt)
         else:
             raise Exception(f"unhandled print_type({print_type}): {txt}")
 
@@ -220,11 +258,44 @@ class LibChatLLM:
     def set_ai_prefix(self, obj: c_void_p, prefix: str) -> int:
         return self._chatllm_set_ai_prefix(obj, c_char_p(prefix.encode()))
 
-    def chat(self, obj: c_void_p, user_input: str) -> int:
-        return self._chatllm_user_input(obj, c_char_p(user_input.encode()))
+    def _input_multimedia_msg(self, obj: c_void_p, user_input: List[dict | str]) -> int:
+        self._chatllm_multimedia_msg_prepare(obj)
+        for x in user_input:
+            if isinstance(x, str):
+                self._chatllm_multimedia_msg_append(obj, c_char_p('text'), c_char_p(x))
+            elif isinstance(x, dict):
+                t = x['type']
+                if t == 'text':
+                    data = x['text'].encode()
+                else:
+                    if 'file' in x:
+                        with open(x['file'], 'rb') as f:
+                            data = f.read()
+                    elif 'url' in x:
+                        url: str = x['url']
+                        if url.startswith('data:'):
+                            i = url.find('base64,')
+                            data = base64.decodebytes(url[i + 7 :].encode())
+                        else:
+                            data = model_downloader.download_file_to_bytes(url)
+                    else:
+                        raise Exception(f'unknown message piece: {x}')
+                    data = base64.b64encode(data)
+                self._chatllm_multimedia_msg_append(obj, c_char_p(t.encode()), c_char_p(data))
 
-    def async_chat(self, obj: c_void_p, user_input: str) -> int:
-        return self._chatllm_async_user_input(obj, c_char_p(user_input.encode()))
+    def chat(self, obj: c_void_p, user_input: str | List[dict | str]) -> int:
+        if isinstance(user_input, str):
+            return self._chatllm_user_input(obj, c_char_p(user_input.encode()))
+        elif isinstance(user_input, list):
+            self._input_multimedia_msg(obj, user_input)
+            return self._chatllm_user_input_multimedia_msg(obj)
+
+    def async_chat(self, obj: c_void_p, user_input: str | List[dict | str]) -> int:
+        if isinstance(user_input, str):
+            return self._chatllm_async_user_input(obj, c_char_p(user_input.encode()))
+        else:
+            self._input_multimedia_msg(obj, user_input)
+            self._chatllm_async_user_input_multimedia_msg(obj)
 
     def ai_continue(self, obj: c_void_p, suffix: str) -> int:
         return self._chatllm_ai_continue(obj, c_char_p(suffix.encode()))
@@ -232,14 +303,23 @@ class LibChatLLM:
     def tool_input(self, obj: c_void_p, user_input: str) -> int:
         return self._chatllm_tool_input(obj, c_char_p(user_input.encode()))
 
+    def async_tool_completion(self, obj: c_void_p, user_input: str) -> int:
+        return self._chatllm_async_tool_completion(obj, c_char_p(user_input.encode()))
+
+    def async_ai_continue(self, obj: c_void_p, suffix: str) -> int:
+        return self._chatllm_async_ai_continue(obj, c_char_p(suffix.encode()))
+
+    def async_tool_input(self, obj: c_void_p, user_input: str) -> int:
+        return self._chatllm_async_tool_input(obj, c_char_p(user_input.encode()))
+
     def tool_completion(self, obj: c_void_p, user_input: str) -> int:
         return self._chatllm_tool_completion(obj, c_char_p(user_input.encode()))
 
     def text_tokenize(self, obj: c_void_p, text: str) -> str:
         return self._chatllm_text_tokenize(obj, c_char_p(text.encode()))
 
-    def text_embedding(self, obj: c_void_p, text: str) -> str:
-        return self._chatllm_text_embedding(obj, c_char_p(text.encode()))
+    def text_embedding(self, obj: c_void_p, text: str, purpose: EmbeddingPurpose = EmbeddingPurpose.Document) -> str:
+        return self._chatllm_text_embedding(obj, c_char_p(text.encode()), c_int(purpose.value))
 
     def qa_rank(self, obj: c_void_p, q: str, a: str) -> float:
         return self._chatllm_qa_rank(obj, c_char_p(q.encode()), c_char_p(a.encode()))
@@ -274,6 +354,11 @@ class LLMChatChunk:
         self.id = id
         self.chunk = chunk
 
+class LLMChatThoughtChunk:
+    def __init__(self, id: Any, chunk: str) -> None:
+        self.id = id
+        self.chunk = chunk
+
 class LLMChatMeta:
     def __init__(self, id: Any, text: str) -> None:
         self.id = id
@@ -293,6 +378,8 @@ class ChatLLM:
         self._result_embedding = None
         self._result_ranking = None
         self._result_text_tokenize = None
+        self._model_info = None
+        self.is_first_thought_chunk = True
         if param is not None:
             self.append_param(param)
             if auto_start:
@@ -309,12 +396,18 @@ class ChatLLM:
         if r != 0:
             raise Exception(f'ChatLLM: failed to `start()` with error code {r}')
 
+    def get_model_info(self) -> dict:
+        if self._model_info is None:
+            raise Exception('Model info not available')
+        return self._model_info
+
     def chat(self, user_input: str, input_id = None) -> None:
         self.is_generating = True
         self.input_id = input_id
         self.references = []
         self.beam_search_results = []
         self.rewritten_query = ''
+        self.is_first_thought_chunk = True
         r = self._lib.chat(self._chat, user_input)
         self.is_generating = False
         if r != 0:
@@ -326,6 +419,7 @@ class ChatLLM:
         self.references = []
         self.beam_search_results = []
         self.rewritten_query = ''
+        self.is_first_thought_chunk = True
         r = self._lib.async_chat(self._chat, user_input)
         if r != 0:
             raise Exception(f'ChatLLM: failed to `async_chat()` with error code {r}')
@@ -347,6 +441,25 @@ class ChatLLM:
         self.tool_completion_id = completion_id
         self.abort()
         r = self._lib.tool_completion(self._chat, user_input)
+        if r != 0:
+            raise Exception(f'ChatLLM: failed to `tool_completion()` with error code {r}')
+
+    def async_ai_continue(self, suffix: str) -> int:
+        self.is_generating = True
+        r = self._lib.async_ai_continue(self._chat, suffix)
+        if r != 0:
+            raise Exception(f'ChatLLM: failed to `ai_continue()` with error code {r}')
+
+    def async_tool_input(self, user_input: str, input_id = None) -> None:
+        self.tool_input_id = input_id
+        r = self._lib.async_tool_input(self._chat, user_input)
+        if r != 0:
+            raise Exception(f'ChatLLM: failed to `tool_input()` with error code {r}')
+
+    def async_tool_completion(self, user_input: str, completion_id = None) -> None:
+        self.tool_completion_id = completion_id
+        self.abort()
+        r = self._lib.async_tool_completion(self._chat, user_input)
         if r != 0:
             raise Exception(f'ChatLLM: failed to `tool_completion()` with error code {r}')
 
@@ -388,6 +501,7 @@ class ChatLLM:
 
     def callback_print_reference(self, s: str) -> None:
         self.references.append(s)
+
     def callback_print_log(self, s: str) -> None:
         print(s)
 
@@ -409,6 +523,15 @@ class ChatLLM:
             print(s, end="", flush=True)
         else:
             self.out_queue.put(LLMChatChunk(self.input_id, s))
+
+    def callback_print_thought(self, s: str) -> None:
+        if self.out_queue is None:
+            if self.is_first_thought_chunk:
+                self.is_first_thought_chunk = False
+                print('====== Thinking ======', flush=True)
+            print(s, end="", flush=True)
+        else:
+            self.out_queue.put(LLMChatThoughtChunk(self.input_id, s))
 
     def callback_print_history_user(self, s: str) -> None:
         pass
@@ -436,6 +559,10 @@ class ChatLLM:
         self.input_id = self.tool_input_id
         self.tool_input_id = None
 
+    def callback_thought_done(self) -> None:
+        if self.out_queue is None:
+            print('\n===================', flush=True)
+
     def callback_async_done(self) -> None:
         self.is_generating = False
 
@@ -456,6 +583,7 @@ class ChatLLMStreamer:
         self.thread.start()
         self.llm.start()
         self.acc = ''
+        self.thought_acc = ''
         self.auto_restart = False
 
     def thread_fun(self) -> None:
@@ -473,22 +601,27 @@ class ChatLLMStreamer:
                 r = r + t
         return r
 
-    def chat(self, user_input: str) -> Iterable[str]:
+    def chat(self, user_input: str) -> Iterable[str | tuple[str, str]]:
         id = self.input_counter
         self.input_counter = self.input_counter + 1
         self.input_queue.put(LLMChatInput(user_input, id))
         self.acc = ''
+        self.thought_acc = ''
         while True:
             output = self.output_queue.get()
             if isinstance(output, LLMChatChunk):
                 if output.id == id:
                     self.acc = self.acc + output.chunk
                     yield output.chunk
+            elif isinstance(output, LLMChatThoughtChunk):
+                if output.id == id:
+                    self.thought_acc = self.thought_acc + output.chunk
+                    yield ('thought', output.chunk)
             elif isinstance(output, LLMChatDone):
                 if output.id == id:
                     break
             elif isinstance(output, LLMChatMeta):
-                yield output.text + '\n'
+                pass
             else:
                 print(output)
                 raise Exception(output)
