@@ -546,8 +546,8 @@ class Graph:
             except DepCheckFailError:
                 continue
             except (PointTooCloseError, PointTooFarError) as e:
-                logging.error(e)
-                exit()
+                logging.warning(e)
+                continue
 
             if not pr.goal:
                 break
