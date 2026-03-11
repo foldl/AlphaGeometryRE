@@ -41,6 +41,14 @@ class EmbeddingPurpose(IntEnum):
     Document = 0,                   # for document
     Query    = 1,                   # for query
 
+def dll_name(lib: str) -> str:
+    if sys.platform == 'win32':
+        return lib + '.dll'
+    elif sys.platform == 'darwin':
+        return lib + '.dylib'
+    else:
+        return lib + '.so'
+
 class LibChatLLM:
 
     _obj2id = {}
@@ -49,22 +57,22 @@ class LibChatLLM:
     def __init__(self, lib: str = '', model_storage: str = '', init_params: list[str] = []) -> None:
 
         if lib == '':
-            lib = os.path.dirname(os.path.abspath(sys.argv[0]))
+            this_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
+            lib = this_dir
+            if not os.path.isfile(os.path.join(lib, dll_name('libchatllm'))):
+                lib = os.path.abspath(os.path.join(this_dir, '..', 'bin'))
+                assert os.path.isfile(os.path.join(lib, dll_name('libchatllm')))
+
         self._lib_path = lib
         self.model_storage = os.path.abspath(model_storage if model_storage != '' else os.path.join(lib, '..', 'quantized'))
 
         init_params = ['--ggml_dir', lib] + init_params
-        lib = os.path.join(lib, 'libchatllm.')
+        lib = os.path.join(lib, dll_name('libchatllm'))
         if sys.platform == 'win32':
             import re
-            lib = lib + 'dll'
             for path in os.getenv('PATH').split(';'):
                 if re.match(r'.+\\CUDA\\v[0-9]+\.[0-9]+\\bin', path) is not None:
                     os.add_dll_directory(path)
-        elif sys.platform == 'darwin':
-            lib = lib + 'dylib'
-        else:
-            lib = lib + 'so'
 
         if sys.platform == 'win32':
             self._lib = windll.LoadLibrary(lib)
@@ -95,7 +103,7 @@ class LibChatLLM:
         self._chatllm_tool_input        = self._lib.chatllm_tool_input
         self._chatllm_tool_completion   = self._lib.chatllm_tool_completion
         self._chatllm_text_tokenize     = self._lib.chatllm_text_tokenize
-        self._chatllm_text_embedding    = self._lib.chatllm_text_embedding
+        self._chatllm_text_embedding    = self._lib.chatllm_embedding
         self._chatllm_qa_rank           = self._lib.chatllm_qa_rank
         self._chatllm_rag_select_store  = self._lib.chatllm_rag_select_store
         self._chatllm_abort_generation  = self._lib.chatllm_abort_generation
@@ -198,6 +206,8 @@ class LibChatLLM:
         txt = s.decode()
         if print_type == PrintType.PRINT_CHAT_CHUNK.value:
             obj.callback_print(txt)
+        elif print_type == PrintType.PRINT_THOUGHT_CHUNK.value:
+            obj.callback_print_thought(txt)
         elif print_type == PrintType.PRINTLN_META.value:
             obj.callback_print_meta(txt)
         elif print_type == PrintType.PRINTLN_REF.value:
@@ -318,7 +328,7 @@ class LibChatLLM:
     def text_tokenize(self, obj: c_void_p, text: str) -> str:
         return self._chatllm_text_tokenize(obj, c_char_p(text.encode()))
 
-    def text_embedding(self, obj: c_void_p, text: str, purpose: EmbeddingPurpose = EmbeddingPurpose.Document) -> str:
+    def embedding(self, obj: c_void_p, text: str, purpose: EmbeddingPurpose = EmbeddingPurpose.Document) -> str:
         return self._chatllm_text_embedding(obj, c_char_p(text.encode()), c_int(purpose.value))
 
     def qa_rank(self, obj: c_void_p, q: str, a: str) -> float:
@@ -364,6 +374,56 @@ class LLMChatMeta:
         self.id = id
         self.text = text
 
+def is_same_command_option(a: str, b: Union[str, list[str]]) -> bool:
+    if isinstance(b, list):
+        for s in b:
+            if is_same_command_option(a, s): return True
+        return False
+
+    if len(a) != len(b): return False
+    for i in range(len(a)):
+        c1 = a[i]
+        c2 = b[i]
+        if c1 == '-': c1 = '_'
+        if c2 == '-': c2 = '_'
+        if c1 != c2: return False
+    return True
+
+class FrontendOptions:
+    def __init__(self, param: Union[None, str, List[str]]) -> None:
+        self.help = False
+        self.interactive = False
+        self.reversed_role = False
+        self.use_multiple_lines = False
+        self.single_turn = False
+        self.prompt = ""
+        self.sys_prompt = ""
+
+        if param is None: return
+        if isinstance(param, str):
+            param = [param]
+
+        i = 0
+        while i < len(param):
+            s = param[i]
+            if is_same_command_option(s, ["-h", "--help"]):
+                self.help = True
+            elif is_same_command_option(s, ["-i", "--interactive"]):
+                self.interactive = True
+            elif is_same_command_option(s, "--reversed_role"):
+                self.reversed_role = True
+            elif is_same_command_option(s, "--multi"):
+                self.use_multiple_lines = True
+            elif is_same_command_option(s, "+single_turn"):
+                self.single_turn = True
+            elif is_same_command_option(s, ["-p", "--prompt"]):
+                i += 1
+                if i < len(param): self.prompt = param[i]
+            elif is_same_command_option(s, ["-s", "--system"]):
+                i += 1
+                if i < len(param): self.sys_prompt = param[i]
+            i += 1
+
 class ChatLLM:
     def __init__(self, lib: LibChatLLM, param: Union[None, str, List[str]], auto_start: bool = True) -> None:
         self._lib = lib
@@ -380,6 +440,7 @@ class ChatLLM:
         self._result_text_tokenize = None
         self._model_info = None
         self.is_first_thought_chunk = True
+        self.fe_options = FrontendOptions(param)
         if param is not None:
             self.append_param(param)
             if auto_start:
@@ -408,6 +469,8 @@ class ChatLLM:
         self.beam_search_results = []
         self.rewritten_query = ''
         self.is_first_thought_chunk = True
+        if self.fe_options.single_turn:
+            self.restart()
         r = self._lib.chat(self._chat, user_input)
         self.is_generating = False
         if r != 0:
@@ -468,9 +531,9 @@ class ChatLLM:
         assert self._lib.text_tokenize(self._chat, txt) >= 0, 'text_tokenize failed'
         return json.loads(f"[{self._result_text_tokenize}]")
 
-    def text_embedding(self, txt: str) -> list[float]:
+    def embedding(self, txt: str) -> list[float]:
         self._result_embedding = ''
-        assert self._lib.text_embedding(self._chat, txt) == 0, 'text_embedding failed'
+        assert self._lib.embedding(self._chat, txt) == 0, 'embedding failed'
         return json.loads(f"[{self._result_embedding}]")
 
     def qa_rank(self, q: str, a: str) -> float:
@@ -675,7 +738,7 @@ def demo_embedding(params, cls = ChatLLM, lib_path: str =''):
     while True:
         s = input('Input    > ')
         print('Embedding > ', flush=True)
-        print(llm.text_embedding(s))
+        print(llm.embedding(s))
 
 def demo_ranking(params, cls = ChatLLM, lib_path: str =''):
     global llm
